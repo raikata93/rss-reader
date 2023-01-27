@@ -10,8 +10,6 @@ import (
 	"time"
 )
 
-var source, sourceUrl string
-
 type rss struct {
 	Channel channel `xml:"channel"`
 }
