@@ -1,7 +1,7 @@
 package main
 
 import (
-	"gitlab.com/raikata93/rss-reader/reader"
+	"github.com/raikata93/ssh-reader/reader"
 )
 
 func main() {
