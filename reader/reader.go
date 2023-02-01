@@ -28,13 +28,12 @@ type RssItem struct {
 	Description string    `xml:"description"`
 }
 
-func Parse() []byte {
+func Parse(urls []string) []byte {
 	var wg sync.WaitGroup
 	var all_result []RssItem
 	results := make(map[string][]RssItem)
 
 	c := make(chan []RssItem)
-	urls := []string{"https://dir.bg/feeds/rss", "https://medium.com/feed/towardsdev", "https://flalottery.com/video/en/theWinningNumber.xml"}
 	for _, url := range urls {
 		wg.Add(1)
 		url := url
