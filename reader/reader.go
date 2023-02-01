@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -28,13 +29,14 @@ type RssItem struct {
 	Description string    `xml:"description"`
 }
 
-func Parse(urls []string) []byte {
+func Parse(urls string) []byte {
 	var wg sync.WaitGroup
 	var all_result []RssItem
 	results := make(map[string][]RssItem)
 
 	c := make(chan []RssItem)
-	for _, url := range urls {
+	urlSlice := strings.Split(urls, ",")
+	for _, url := range urlSlice {
 		wg.Add(1)
 		url := url
 		go func() {
