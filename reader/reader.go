@@ -21,12 +21,12 @@ type channel struct {
 }
 
 type RssItem struct {
-	Title       string `xml:"title"`
-	Source      string
-	SourceURL   string
-	Link        string    `xml:"link"`
-	PublishDate time.Time `xml:"pubdate"`
-	Description string    `xml:"description"`
+	Title       string    `xml:"title" json:"title"`
+	Source      string    `xml:"source" json:"source"`
+	SourceURL   string    `xml:"source_url" json:"source_url"`
+	Link        string    `xml:"link" json:"link"`
+	PublishDate time.Time `xml:"pubdate" json:"publish_date"`
+	Description string    `xml:"description" json:"description"`
 }
 
 func Parse(urls string) []byte {
