@@ -1,7 +1,6 @@
 package reader
 
 import (
-	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"github.com/araddon/dateparse"
@@ -27,12 +26,12 @@ type TitleFeed string
 type LinkFeed string
 
 type RssItem struct {
-	Title       string    `xml:"title" json:"title"`
-	Source      string    `xml:"source" json:"source"`
-	SourceURL   string    `xml:"source_url" json:"source_url"`
-	Link        string    `xml:"link" json:"link"`
-	PublishDate time.Time `xml:"pubdate" json:"publish_date"`
-	Description string    `xml:"description" json:"description"`
+	Title       string    `xml:"title"`
+	Source      string    `xml:"source"`
+	SourceURL   string    `xml:"source_url"`
+	Link        string    `xml:"link"`
+	PublishDate time.Time `xml:"pubdate"`
+	Description string    `xml:"description"`
 }
 
 func (e *TitleFeed) UnmarshalXML(d *xml.Decoder, start xml.StartElement) (err error) {
@@ -84,47 +83,49 @@ func (e *RssItem) UnmarshalXML(d *xml.Decoder, start xml.StartElement) (err erro
 	return nil
 }
 
-func Parse(urls string) []byte {
-	var wg sync.WaitGroup
-	var all_result []RssItem
-	results := make(map[string][]RssItem)
+func Parse(urls string) ([]RssItem, error) {
+	var (
+		wg        sync.WaitGroup
+		allResult []RssItem
+	)
 	c := make(chan []RssItem)
 	urlSlice := strings.Split(urls, ",")
+	wg.Add(len(urlSlice))
 	for _, url := range urlSlice {
-		wg.Add(1)
 		url := url
 		go func() {
-			result := parseXml(url)
+			defer wg.Done()
+			result, err := parseXml(url)
+			if err != nil {
+				return
+			}
 			c <- result
-			wg.Done()
 		}()
 	}
-
 	go func() {
+		defer close(c)
 		wg.Wait()
-		close(c)
 	}()
-	for result := range c {
-		all_result = append(all_result, result...)
-	}
-	results["items"] = all_result
-	jsonStr, _ := json.Marshal(results["items"])
 
-	return jsonStr
+	for result := range c {
+		allResult = append(allResult, result...)
+	}
+
+	return allResult, nil
 }
 
-func parseXml(url string) []RssItem {
+func parseXml(url string) ([]RssItem, error) {
 	xmlBytes, err := getXML(url)
 	if err != nil {
-		fmt.Printf("Error during getXml: %s", err)
+		return nil, fmt.Errorf("error during getXml: %s", err)
 	}
 	rssFeed := rss{}
 	err = xml.Unmarshal(xmlBytes, &rssFeed)
 	if err != nil {
-		fmt.Printf("Error during Unmarshal: %s", err)
+		return nil, fmt.Errorf("error during Unmarshal: %s", err)
 	}
 
-	return rssFeed.Channel.Items
+	return rssFeed.Channel.Items, nil
 }
 
 func getXML(url string) ([]byte, error) {
@@ -135,7 +136,7 @@ func getXML(url string) ([]byte, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return []byte{}, fmt.Errorf("Status error: %v", resp.StatusCode)
+		return []byte{}, fmt.Errorf("status error: %v", resp.StatusCode)
 	}
 
 	data, err := io.ReadAll(resp.Body)
