@@ -3,27 +3,20 @@ package reader
 import (
 	"encoding/xml"
 	"fmt"
-	"github.com/araddon/dateparse"
-	"io"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 )
 
-var source, sourceUrl string
-
 type rss struct {
 	Channel channel `xml:"channel"`
 }
 type channel struct {
-	Title TitleFeed `xml:"title"`
-	Link  LinkFeed  `xml:"link"`
+	Title string    `xml:"title"`
+	Link  string    `xml:"link"`
 	Items []RssItem `xml:"item"`
 }
-
-type TitleFeed string
-type LinkFeed string
 
 type RssItem struct {
 	Title       string    `xml:"title"`
@@ -32,55 +25,6 @@ type RssItem struct {
 	Link        string    `xml:"link"`
 	PublishDate time.Time `xml:"pubdate"`
 	Description string    `xml:"description"`
-}
-
-func (e *TitleFeed) UnmarshalXML(d *xml.Decoder, start xml.StartElement) (err error) {
-	var t xml.Token
-	for t, err = d.Token(); err == nil; t, err = d.Token() {
-		switch tt := t.(type) {
-		case xml.CharData:
-			source = string(tt)
-		}
-	}
-	return nil
-}
-
-func (e *LinkFeed) UnmarshalXML(d *xml.Decoder, start xml.StartElement) (err error) {
-	var t xml.Token
-	for t, err = d.Token(); err == nil; t, err = d.Token() {
-		switch tt := t.(type) {
-		case xml.CharData:
-			sourceUrl = string(tt)
-		}
-	}
-	return nil
-}
-
-func (e *RssItem) UnmarshalXML(d *xml.Decoder, start xml.StartElement) (err error) {
-	tokName := ""
-	var t xml.Token
-	for t, err = d.Token(); err == nil; t, err = d.Token() {
-		switch tt := t.(type) {
-		case xml.StartElement:
-			tokName = tt.Name.Local
-		case xml.CharData:
-			switch tokName {
-			case "title":
-				e.Title = string(tt)
-			case "link":
-				e.Link = string(tt)
-			case "pubDate":
-				e.PublishDate, _ = dateparse.ParseAny(string(tt))
-			case "description":
-				e.Description = string(tt)
-			}
-		case xml.EndElement:
-			tokName = ""
-		}
-	}
-	e.Source = source
-	e.SourceURL = sourceUrl
-	return nil
 }
 
 func Parse(urls string) ([]RssItem, error) {
@@ -115,34 +59,32 @@ func Parse(urls string) ([]RssItem, error) {
 }
 
 func parseXml(url string) ([]RssItem, error) {
-	xmlBytes, err := getXML(url)
+	resp, err := getXML(url)
+	defer resp.Body.Close()
+	rss := rss{}
+	decoder := xml.NewDecoder(resp.Body)
+	err = decoder.Decode(&rss)
 	if err != nil {
-		return nil, fmt.Errorf("error during getXml: %s", err)
-	}
-	rssFeed := rss{}
-	err = xml.Unmarshal(xmlBytes, &rssFeed)
-	if err != nil {
-		return nil, fmt.Errorf("error during Unmarshal: %s", err)
+		fmt.Printf("Error Decode: %v\n", err)
 	}
 
-	return rssFeed.Channel.Items, nil
+	var data []RssItem
+	for _, item := range rss.Channel.Items {
+		item.Source = rss.Channel.Title
+		item.SourceURL = rss.Channel.Link
+		data = append(data, item)
+	}
+	return data, nil
 }
 
-func getXML(url string) ([]byte, error) {
+func getXML(url string) (*http.Response, error) {
 	resp, err := http.Get(url)
 	if err != nil {
-		return []byte{}, fmt.Errorf("GET error: %v", err)
+		return &http.Response{}, fmt.Errorf("GET error: %v", err)
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return []byte{}, fmt.Errorf("status error: %v", resp.StatusCode)
+		return &http.Response{}, fmt.Errorf("status error: %v", resp.StatusCode)
 	}
-
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return []byte{}, fmt.Errorf("Read body: %v", err)
-	}
-
-	return data, nil
+	return resp, nil
 }
