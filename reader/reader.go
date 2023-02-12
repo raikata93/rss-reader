@@ -3,6 +3,7 @@ package reader
 import (
 	"encoding/xml"
 	"fmt"
+	"github.com/araddon/dateparse"
 	"net/http"
 	"strings"
 	"sync"
@@ -25,6 +26,31 @@ type RssItem struct {
 	Link        string    `xml:"link"`
 	PublishDate time.Time `xml:"pubdate"`
 	Description string    `xml:"description"`
+}
+
+func (e *RssItem) UnmarshalXML(d *xml.Decoder, start xml.StartElement) (err error) {
+	tokName := ""
+	var t xml.Token
+	for t, err = d.Token(); err == nil; t, err = d.Token() {
+		switch tt := t.(type) {
+		case xml.StartElement:
+			tokName = tt.Name.Local
+		case xml.CharData:
+			switch tokName {
+			case "title":
+				e.Title = string(tt)
+			case "link":
+				e.Link = string(tt)
+			case "pubDate":
+				e.PublishDate, _ = dateparse.ParseAny(string(tt))
+			case "description":
+				e.Description = string(tt)
+			}
+		case xml.EndElement:
+			tokName = ""
+		}
+	}
+	return nil
 }
 
 func Parse(urls string) ([]RssItem, error) {
@@ -65,7 +91,7 @@ func parseXml(url string) ([]RssItem, error) {
 	decoder := xml.NewDecoder(resp.Body)
 	err = decoder.Decode(&rss)
 	if err != nil {
-		fmt.Printf("Error Decode: %v\n", err)
+		return nil, fmt.Errorf("Error Decode: %v\n", err)
 	}
 
 	var data []RssItem
