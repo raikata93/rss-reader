@@ -58,11 +58,15 @@ func Parse(urls string) ([]RssItem, error) {
 		wg        sync.WaitGroup
 		allResult []RssItem
 	)
+	if urls == "" {
+		return allResult, nil
+	}
 	c := make(chan []RssItem)
 	urlSlice := strings.Split(urls, ",")
 	wg.Add(len(urlSlice))
 	for _, url := range urlSlice {
 		url := url
+		fmt.Println(url)
 		go func() {
 			defer wg.Done()
 			result, err := parseXml(url)
